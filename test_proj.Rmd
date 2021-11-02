@@ -1,0 +1,147 @@
+---
+title: 'Project 1: Wrangling, Exploration, Visualization'
+author: "SDS322E"
+date: ''
+output:
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+  pdf_document:
+    toc: no
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, fig.align = "center", warning = F, message = F,
+tidy=TRUE, tidy.opts=list(width.cutoff=60), R.options=list(max.print=100))
+```
+
+## Data Wrangling, Exploration, Visualization
+
+### Michelle Park, EID: mnp892
+
+#### Introduction 
+
+Paragraph or two introducing your datasets and variables, why they are interesting to you, etc.
+
+```{R}
+library(dplyr)
+library(tidyverse)
+happiness <- read_csv("happiness_report_2020.csv")
+ratio_weekly <- read_csv("ratio_weekly_2020.csv")
+```
+
+#### Tidying: Reshaping
+
+If your datasets are tidy already, demonstrate that you can reshape data with pivot wider/longer here (e.g., untidy and then retidy). Alternatively, it may be easier to wait until the wrangling section so you can reshape your summary statistics. Note here if you are going to do this.
+
+```{R}
+# tidying ratio_weekly for readability
+ratio_weekly <- ratio_weekly %>% pivot_wider(names_from="indicator.label", values_from="obs_value")
+ratio_weekly <- ratio_weekly %>% rename("Country"=ref_area.label, "ratio_hours"="Ratio of total weekly hours worked to population aged 15-64 -- ILO modelled estimates") %>% select(Country, ratio_hours)
+
+# renaming ID variable for 'happiness'; prep for joining
+happiness <- happiness %>% rename("Country"="Country name")
+```
+
+    
+#### Joining/Merging
+
+```{R}
+
+# countries that appear in 'happiness' but not in 'ratio_weekly'
+glimpse(anti_join(happiness, ratio_weekly, by="Country"))
+
+# countries that appear in 'ratio_weekly' but not in 'happiness'
+glimpse(anti_join(ratio_weekly, happiness, by="Country"))
+
+# renaming certain country names in datasets to match
+rename_ratio_country <- function(x, y){
+  ratio_weekly %>% mutate(Country=str_replace(Country, x, y))
+}
+
+rename_happiness_country <- function(x, y){
+  happiness %>% mutate(Country=str_replace(Country, x, y))
+}
+
+ratio_weekly <- ratio_weekly %>% mutate(Country=str_replace(Country, ",", ""))
+happiness <- happiness %>% mutate(Country=str_remove_all(Country, "[().]"))
+
+orig_names_ratio <- c("Czechia", "Taiwan China", "Korea Republic of", "Lao People's Democratic Republic",
+                     "Iran Islamic Republic of", "Hong Kong China", "Russian Federation", "Venezuela Bolivarian Republic of",
+                     "Moldova Republic of", "Viet Nam", "North Macedonia", "Tanzania United Republic of", 
+                     "Occupied Palestinian Territory", "Côte d'Ivoire")
+
+new_names_ratio <- c("Czech Republic", "Taiwan", "South Korea", "Laos", "Iran", "Hong Kong", "Russia", "Venezuela", 
+                    "Moldova", "Vietnam", "Macedonia", "Tanzania", "Palestinian Territories", "Ivory Coast")
+
+orig_names_happiness <- c("Taiwan Province of China", "Hong Kong SAR of China", "Swaziland", "Congo Kinshasa", "Congo Brazzaville")
+
+new_names_happiness <- c("Taiwan", "Hong Kong", "Eswatini", "Congo", "Congo")
+
+# loop to rename multiple countries
+for (i in 1:length(orig_names_ratio)){
+  ratio_weekly <- rename_ratio_country(orig_names_ratio[i], new_names_ratio[i])
+}
+
+for (i in 1:length(orig_names_happiness)){
+  happiness <- rename_happiness_country(orig_names_happiness[i], new_names_happiness[i])
+}
+
+# final join: inner_join
+final_data <- inner_join(ratio_weekly, happiness, by="Country")
+final_data
+```
+
+Discussions of joining here. Feel encouraged to break up into more than once code chunk and discuss each in turn.
+
+Notes:
+num observations happiness: 153 rows, 153 distinct IDs
+obs in happiness but not in ratio_weekly: table
+num obs dropped from happiness:
+
+num observations ratio_weekly: 188 rows, 188 distinct IDs
+obs in ratio_weekly but not in happiness: table
+num obs dropped from ratio_weekly: 
+
+####  Wrangling
+
+```{R}
+# your wrangling code
+
+# your wrangling code
+
+# your wrangling code
+```
+
+Your discussion of wrangling section here. Feel encouraged to break up into more than once code chunk and discuss each in turn.
+
+
+#### Visualizing
+
+```{R}
+# your plot 1
+```
+
+Your discussion of plot 1
+
+```{R}
+# your plot 2
+```
+
+Your discussion of plot 2
+
+```{R}
+# your plot 3
+```
+
+Your discussion of plot 3
+
+#### Concluding Remarks
+
+If any!
+
+
+
+

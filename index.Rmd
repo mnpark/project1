@@ -19,15 +19,34 @@ tidy=TRUE, tidy.opts=list(width.cutoff=60), R.options=list(max.print=100))
 
 ## Data Wrangling, Exploration, Visualization
 
-### Name and EID here
+### Michelle Park, EID: mnp892
 
 #### Introduction 
 
-Paragraph or two introducing your datasets and variables, why they are interesting to you, etc.
+#### 0.1 Introduction to project idea and scope
+In the modern age, the business of daily life often leads us to forget about how important it is to be happy. "Happiness" drives us to life our lives to the fullest and is an emotion that is crucial to the human existence. For this project, I have chosen to examine the relationships and interactions between life expectancy, working hours, and Happiness Scores (representative of happy emotion on a quantitative scale) for countries around the world. As a student, this topic of happiness in relation to work and life expectancy really resonated with my current concerns as I navigate the hectic nature of school while also trying to determine the pathway of my life both academically and personally.
+
+#### 0.2 What is in my final dataset?
+My final dataset 'final_data' consists of 5 total variables and 150 observations (countries). The 5 variables are 'country', 'region', 'hours', 'happiness', and 'life'. 'country', 'region', 'happiness', and 'life' were obtained from the dataset 'happiness', while 'hours' was obtained from the dataset 'ratio_weekly'. 'country' was the merge ID variable.
+
+#### 0.3 About the 'happiness' dataset:
+Data for Happiness Scores ('happiness'), along with region ('region'), and life expectancy ('life'), were obtained from the 2020 edition of the World Happiness Report. The World Happiness Report consists of national rankings of happiness based on a responses to Gallup World Poll surveys across a set of years (2017-2019 for the 2020 report). Happiness Score calculations are based on answers to the main life evaluation question asked in the poll, (answered on the Cantril ladder: best case being a 10, and the worst case being a 0). The Happiness Score itself is a value between 1 and 10. 
+
+The 'happiness' dataset used in this project is a subset of data from the 2020 edition of the World Happiness Report, and consists of the national Happiness Scores of 153 countries, their regions, and six key variables (GDP per capita, social support, healthy life expectancy, freedom to make life choices, generosity, and freedom from corruption) that contribute to explaining the national annual average scores. The dataset also contains a variable named "Dystopia" (not used in analysis), which serves as a hypothetical country that contains values equal to the world’s lowest national averages for the six key variables; this value is often used as a benchmark.
+
+#### 0.4 About the 'ratio_weekly' dataset:
+The 'ratio_weekly' dataset contains 5 variables: 'ref_area.label' (country names), 'indicator.label' (all rows say "Ratio of total weekly hours worked to population aged 15-64 -- ILO modelled estimates"), 'source_label' (all values say ILO - "ILO Modelled Estimates"), 'time' (year 2020 for all values), 'obs_value' (actual ratio of total weekly hours worked to population aged 15-64), and 'hours' describes the ratio of total weekly hours worked to population aged 15-64, and was obtained through data provided by the International Labour Organization. This particular age range was chosen because it is defined as working-age by organizations including but not limited to OECD and the World Bank.
+
+#### 0.5 Potential associations between variables
+I hypothesize that there will be a positive association between life expectancy vs. Happiness Scores, and negative associations between life expectancy vs. total weekly hours worked (ages 15-64) as well as Happiness Scores vs. total weekly hours worked (ages 15-64).
 
 ```{R}
-# read your datasets in here, e.g., with read_csv()
-
+library(dplyr)
+library(tidyverse)
+library(knitr)
+library(gt)
+happiness <- read_csv("happiness_report_2020.csv")
+ratio_weekly <- read_csv("ratio_weekly_2020.csv")
 ```
 
 #### Tidying: Reshaping
@@ -35,56 +54,157 @@ Paragraph or two introducing your datasets and variables, why they are interesti
 If your datasets are tidy already, demonstrate that you can reshape data with pivot wider/longer here (e.g., untidy and then retidy). Alternatively, it may be easier to wait until the wrangling section so you can reshape your summary statistics. Note here if you are going to do this.
 
 ```{R}
-# your tidying code (if applicable; can also wait until wrangling section)
+# tidying ratio_weekly for readability
+ratio_weekly <- ratio_weekly %>% pivot_wider(names_from="indicator.label", values_from="obs_value")
+ratio_weekly <- ratio_weekly %>% rename("country"=ref_area.label, "hours"="Ratio of total weekly hours worked to population aged 15-64 -- ILO modelled estimates") %>% select(country, hours)
+
+# renaming ID variable for 'happiness'; prep for joining
+happiness <- happiness %>% rename("country"="Country name")
 ```
+
+First, I pivoted the 'ratio_weekly' dataset into a wider format to condense the 'indicator.label' and 'obs_value' variables into one column. In this new format with 'indicator.label' as a column name and 'obs_value' as values for the same column, I proceeded to rename 'ref_area.label' and 'Ratio of total weekly hours worked to population aged 15-64 -- ILO modelled estimates' to 'country' and 'hours' (respectively) for better dataset usability. I decided to select the 'country' and 'hours' columns to use for further analysis and stored them in 'ratio_weekly' to facilitate merging in the next step. I also renamed the 'Country name' variable in 'happiness' to 'country', so that the merge could be simplified with a common ID variable across the two datasets.
 
     
 #### Joining/Merging
 
 ```{R}
-# your joining code
+# countries that appear in 'happiness' but not in 'ratio_weekly'
+glimpse(anti_join(happiness, ratio_weekly, by="country"))
 
-# your joining code
+# countries that appear in 'ratio_weekly' but not in 'happiness'
+glimpse(anti_join(ratio_weekly, happiness, by="country"))
+
+# renaming certain country names in datasets to match:
+
+# 1. functions for renaming countries
+rename_ratio_country <- function(x, y){
+  ratio_weekly %>% mutate(country=str_replace(country, x, y))
+}
+
+rename_happiness_country <- function(x, y){
+  happiness %>% mutate(country=str_replace(country, x, y))
+}
+
+# 2. removing unnecessary punctuation using stringr (, ())
+ratio_weekly <- ratio_weekly %>% mutate(country=str_replace(country, ",", ""))
+happiness <- happiness %>% mutate(country=str_remove_all(country, "[().]"))
+
+# 3. organization of original names and new names for each dataset
+orig_names_ratio <- c("Czechia", "Taiwan China", "Korea Republic of", "Lao People's Democratic Republic",
+                     "Iran Islamic Republic of", "Hong Kong China", "Russian Federation", "Venezuela Bolivarian Republic of",
+                     "Moldova Republic of", "Viet Nam", "North Macedonia", "Tanzania United Republic of", 
+                     "Occupied Palestinian Territory", "Côte d'Ivoire")
+
+new_names_ratio <- c("Czech Republic", "Taiwan", "South Korea", "Laos", "Iran", "Hong Kong", "Russia", "Venezuela", 
+                    "Moldova", "Vietnam", "Macedonia", "Tanzania", "Palestinian Territories", "Ivory Coast")
+
+orig_names_happiness <- c("Taiwan Province of China", "Hong Kong SAR of China", "Swaziland", "Congo Kinshasa", "Congo Brazzaville")
+
+new_names_happiness <- c("Taiwan", "Hong Kong", "Eswatini", "Congo", "Congo")
+
+# 4. loop to rename countries
+for (i in 1:length(orig_names_ratio)){
+  ratio_weekly <- rename_ratio_country(orig_names_ratio[i], new_names_ratio[i])
+}
+
+for (i in 1:length(orig_names_happiness)){
+  happiness <- rename_happiness_country(orig_names_happiness[i], new_names_happiness[i])
+}
+
+# final join: inner_join
+final_data <- inner_join(ratio_weekly, happiness, by="country")
+glimpse(final_data)
 ```
 
-Discussions of joining here. Feel encouraged to break up into more than once code chunk and discuss each in turn.
+The 'happiness' dataset consists of 153 rows (countries), with 153 distinct IDs. There are 19 rows (countries) that appear in 'happiness' but do not appear in 'ratio_weekly'. On the other hand, the 'ratio_weekly' dataset consists of 188 rows (countries), with 188 distinct IDs. There are 54 rows (countries) that appear in 'ratio_weekly' but do not appear in 'happiness'. 
+
+For both datasets, the rows that do not appear in the other dataset are not due to NA values being present in the data but are instead due to mismatching country names (such as 'Taiwan, China' in 'ratio_weekly' and 'Taiwan' in 'happiness') or inclusion of a larger set of territories as countries, especially in the 'ratio_weekly' dataset (such as island countries like Barbados or the Channel Islands). Generally, the IDs that the two datasets do have in common are for countries that are referred to as their most common name, such as Afghanistan, Belgium, and Denmark.
+
+Before conducting the merge, I needed to rename some of the countries so that the merge could take into account instances of the same country being under different names. I declared two functions (step 1): one used to rename countries in 'ratio_weekly', and one used to rename countries in 'happiness'. I then used stringr methods to clean up unnecessary punctuation in country names (step 2). For each dataset, I created a vector for the original country names that needed to be changed as well as a counterpart vector for the new country names that would be applied (step 3). I used the functions I created to loop through the vectors and redefine the existing datasets with new country names (step 4).
+
+After this process of manipulating the country names was finished, I then proceeded to use 'inner_join' to join the two datasets together. I chose 'inner_join' because I wanted to use only the countries that have corresponding, valid values for all the columns found in both datasets. The final dataset (at this point) has 151 rows. This is 2 less rows than found in 'happiness', and 37 less rows than found in 'ratio_weekly'. While the 'inner_join' removes rows that have invalid values in either dataset and leaves only the valid rows, it eliminates some countries from being included in the statistical analysis which may provide a slightly skewed version of the data when compared to its original form. 
 
 ####  Wrangling
 
 ```{R}
-# your wrangling code
+# 1. select columns to use, rename for simplicity, merge duplicate rows
+final_data <- final_data %>% select(1:10) %>% select(!(5:9))
+final_data
+final_data <- final_data %>% rename(c("region"="Regional indicator", "happiness"="Ladder score", "life"="Healthy life expectancy"))
+final_data <- final_data %>% group_by(country, region) %>% summarize_if(is.numeric, mean) %>% ungroup
 
-# your wrangling code
+# 2. counts number of countries in each region (categorical)
+final_data %>% group_by(region) %>% summarize(num_countries=n()) %>% arrange(-num_countries)
 
-# your wrangling code
+# 3. summary stats for all countries
+numNA <- function(x) sum(is.na(x))
+
+region_stats <- final_data %>% summarize_at(c("hours", "happiness", "life"), list(mean=mean,sd=sd, min=min, max=max, numNA=numNA)) %>% pivot_longer(contains("_")) %>% separate(name, into = c("variable", "stat")) %>% pivot_wider(names_from = "variable", values_from = "value")
+
+region_stats %>% gt %>% tab_header(title=md("Summary Statistics 1"), subtitle=md("across all countries in dataset")) %>% tab_spanner(label="Variables", columns=c("hours", "happiness", "life")) %>% cols_align(align="center", columns=c("hours", "happiness"))
+
+# 4. for regions with average happiness scores greater than or equal to 5
+above_5 <- final_data %>% filter(happiness >= 5) %>% mutate(avg_hours=mean(hours), avg_happiness=mean(happiness), avg_life=mean(life)) %>% select(region, avg_hours, avg_happiness, avg_life) %>% distinct %>% summarize_at(c(2:4), mean)
+
+above_5 %>% gt %>% tab_header(title=md("Summary Statistics 2"), subtitle=md("regions with average happiness score greater than/equal to 5")) %>% tab_spanner(label="Variables", columns=c("avg_hours", "avg_happiness", "avg_life")) %>% cols_align(align="center")
+
+# 5. for regions with average happiness scores less than 5
+below_5 <- final_data %>% filter(happiness < 5) %>% mutate(avg_hours=mean(hours), avg_happiness=mean(happiness), avg_life=mean(life)) %>% select(region, avg_hours, avg_happiness, avg_life) %>% distinct %>% summarize_at(c(2:4), mean)
+
+below_5 %>% gt %>% tab_header(title=md("Summary Statistics 3"), subtitle=md("regions with average happiness score less than 5")) %>% tab_spanner(label="Variables", columns=c("avg_hours", "avg_happiness", "avg_life")) %>% cols_align(align="center")
 ```
 
-Your discussion of wrangling section here. Feel encouraged to break up into more than once code chunk and discuss each in turn.
+Before starting the wrangling process, I removed columns containing pre-existing statistical analyses from the final dataset so that only variables with actual data values remained. I then selected the variables that I wanted to use for the rest of my analysis and proceeded to rename them ('Regional indicator' became 'region', 'Ladder score' became 'happiness', and 'Healthy life expectancy' became 'life'. These changes were incorporated into the existing final dataset, which was then grouped by country and region to merge duplicate rows (Congo appeared twice, but collapsing the two rows was possible by summarizing its numerical variables) (step 1).
 
+I computed summary statistics for my variables in three different ways: for all countries in the final dataset (step 3), for regions of countries with average happiness scores greater than or equal to 5 (step 4), and for regions of countries with average happiness scores less than 5 (step 5). While the statistical summary of all the countries (Summary Statistics 1) encompasses mean, standard deviation, minimum, maximum, and the number of NA values for all of the variables, the regional analyses specifically examined the average ratio of total weekly hours worked to population aged 15-64, average Happiness Score, and average life expectancy across regions of the world with either a Happiness Score either greater than/equal to 5 (Summary Statistics 2) or a Score less than 5 (Summary Statistics 3). Surprisingly, regions with Happiness Scores lower than 5 documented a lower average total weekly hours worked to population aged 15-64 than regions with Happiness Scores greater than/equal to 5 did, which goes against one of my initial predictions discussed in the introduction! Average life expectancy, however, was higher in regions with Happiness Scores greater than/equal to 5, which aligns with our predictions.
 
 #### Visualizing
 
 ```{R}
-# your plot 1
+ggplot(final_data, aes(happiness, life)) + 
+  geom_point(aes(color=region)) +
+  geom_smooth(method="lm", color="black") +
+  scale_y_continuous(breaks=seq(40, 80, 5)) +
+  scale_x_continuous(breaks=seq(0, 10, 1)) +
+  labs(title="Happiness Score and Life Expectancy", x="Happiness Score", y="Life Expectancy (years)") +
+  scale_color_discrete(name="Region") + 
+  theme_light()
 ```
 
-Your discussion of plot 1
+This is a scatter plot that depicts the relationship between Happiness Scores and life expectancy for countries in the final dataset, colored by region. The regression line shows that the general pattern of the data is positive and presents moderately strong relationship between the two variables. It can be seen in the graph that countries in the Sub-Saharan African region tend to have the lowest Happiness Scores and life expectancies as a region. On the other hand, it seems like many of the countries in the Central and Eastern Europe region tend to have the highest Happiness Scores and life expectancies as a region.
 
 ```{R}
-# your plot 2
+# 1. create dataset to differentiate countries with average happiness scores over 5
+over_5 <- final_data %>% mutate(over_5=(happiness >= 5))
+over_5 <- over_5 %>% mutate(over_5=as.character(over_5))
+over_5 <- over_5 %>% mutate(over_5=str_replace(over_5, "TRUE", "over")) %>% mutate(over_5=str_replace(over_5, "FALSE", "not"))
+
+# 2. creation of boxplot for comparison
+ggplot(over_5, aes(x=over_5, y=hours)) +
+  geom_boxplot() +
+  geom_jitter(alpha=0.6, aes(color=over_5), show.legend=FALSE) +
+  scale_y_continuous(breaks=seq(10, 40, 5)) +
+  labs(title="Happiness Score and Ratio of total weekly hours worked to population (15-64)", x="Happiness Score", y="Ratio of total weekly hours worked, population 15-64 (hours)") + 
+  scale_x_discrete(labels=c("Score less than 5", "Score equal to/greater than 5")) + 
+  theme_light()
 ```
 
-Your discussion of plot 2
+This is a grouped boxplot that compares the ratio of total weekly hours worked to population (15-64) in countries that have Happiness Scores either less than 5 or greater than/equal to 5. It is interesting to see that there is a lot of overlap between these two boxplots, and that the average workload in countries that are considered 'happier' in this case is higher than countries that are 'unhappier'. There also seem to be some stark differences in average workload among countries with Happiness Scores over 5, as are represented by the outliers on both ends of the plot on the right.
 
 ```{R}
-# your plot 3
+ggplot(over_5, aes(x=over_5, y=life, fill=over_5)) +
+  geom_bar(stat="summary", fun=mean, width=0.5, show.legend=FALSE) +
+  geom_errorbar(stat="summary", fun.data=mean_se, width=0.2) +
+  labs(title="Happiness Score and Average Life Expectancy", x="Happiness Score", y="Life Expectancy (years)") +
+  scale_x_discrete(labels=c("Score less than 5", "Score equal to/greater than 5")) +
+  scale_y_continuous(breaks=seq(10, 80, 5)) +
+  theme_light()
 ```
 
-Your discussion of plot 3
+This is a bar chart with error bars that compares the average life expectancy of countries with Happiness Scores either less than 5 or greater than/equal to 5. This bar chart shows us that there is a clear difference in the average life expectancies of the two groups even with a range of error included (there is no overlap, which likely indicates a significant difference in the average life expectancy). Countries with Happiness Scores greater than or equal to 5 have an average life expectancy that is greater than that of countries with Happiness Scores less than 5, indicating a possible positive relationship between the two variables.
 
 #### Concluding Remarks
-
-If any!
+Overall, it was an enriching experience learning about the relationships between Happiness Scores, life expectancy, and the ratio of total weekly hours worked to population aged 15-64. Though this analysis is only a starting point, it would be interesting to see how other socioeconomic factors can play a role in influencing Happiness Scores and how dynamic the data is for 2021 as the world is slowly starting to open up again after two years of global crisis (maybe an idea for a follow up project)!
 
 
 
